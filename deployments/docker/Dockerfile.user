@@ -1,0 +1,35 @@
+# Build stage
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache git
+
+# 先拷贝 go.mod 和 go.sum，用于缓存依赖
+COPY user-service/go.mod user-service/go.sum ./
+COPY shared/ ../shared/
+RUN go mod download
+# Copy source code and shared files
+COPY user-service/ .
+
+# 构建可执行文件（生产）
+RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+
+# Final stage
+FROM alpine:latest
+
+WORKDIR /root/
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+# Copy the binary from builder stage
+COPY --from=builder /app/main .
+COPY --from=builder /app/config.yaml .
+
+# Expose port
+EXPOSE 8081
+
+# Command to run
+CMD ["./main"]

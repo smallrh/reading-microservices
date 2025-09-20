@@ -1,0 +1,62 @@
+server:
+  name: "api-gateway"
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  user_service:
+    name: "user-service"
+    host: "user-service"  # 使用Docker服务名
+    port: 8081
+    health_check: "/health"
+  content_service:
+    name: "content-service"
+    host: "content-service"
+    port: 8082
+    health_check: "/health"
+  reading_service:
+    name: "reading-service"
+    host: "reading-service"
+    port: 8083
+    health_check: "/health"
+  payment_service:
+    name: "payment-service"
+    host: "payment-service"
+    port: 8084
+    health_check: "/health"
+  notification_service:
+    name: "notification-service"
+    host: "notification-service"
+    port: 8085
+    health_check: "/health"
+  download_service:
+    name: "download-service"
+    host: "download-service"
+    port: 8086
+    health_check: "/health"
+
+redis:
+  host: "localhost"
+  port: 6380
+  password: ""
+  db: 2
+
+jwt:
+  secret: "reading-app-secret-key"
+  expires_in: 86400
+
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: ""
+  database: "reading_app"
+  charset: "utf8mb4"
+
+consul:
+  host: "localhost"
+  port: 8500
+
+rate_limit:
+  requests_per_minute: 1000
+  burst: 100

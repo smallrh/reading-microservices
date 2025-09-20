@@ -1,0 +1,521 @@
+version: '3.8'
+
+services:
+  # 基础设施
+  mysql:
+    image: mysql:8.0
+    container_name: reading-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: reading_app
+      MYSQL_USER: reading
+      MYSQL_PASSWORD: reading123
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../../read_demo_database.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - reading-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: reading-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - reading-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  consul:
+    image: consul:1.15
+    container_name: reading-consul
+    ports:
+      - "8500:8500"
+    command: >
+      consul agent -dev -ui -client=0.0.0.0 -bind=0.0.0.0
+    networks:
+      - reading-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # 微服务
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.gateway
+    container_name: reading-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  user-service:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.user
+    container_name: reading-user-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8081
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=password
+      - DATABASE_DATABASE=reading_app
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  content-service:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.content
+    container_name: reading-content-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8082
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=password
+      - DATABASE_DATABASE=reading_app
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  reading-service:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.reading
+    container_name: reading-reading-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8083
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=password
+      - DATABASE_DATABASE=reading_app
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  payment-service:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.payment
+    container_name: reading-payment-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8084
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=password
+      - DATABASE_DATABASE=reading_app
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notification-service:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.notification
+    container_name: reading-notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8085
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=password
+      - DATABASE_DATABASE=reading_app
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  download-service:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.download
+    container_name: reading-download-service
+    ports:
+      - "8086:8086"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8086
+      - DATABASE_HOST=mysql
+      - DATABASE_PORT=3306
+      - DATABASE_USERNAME=root
+      - DATABASE_PASSWORD=password
+      - DATABASE_DATABASE=reading_app
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - JWT_SECRET=reading-app-secret-key
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - reading-network
+    restart: unless-stopped
+    volumes:
+      - download_data:/app/downloads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dify AI平台服务
+  dify-db:
+    image: postgres:15-alpine
+    container_name: reading-dify-db
+    environment:
+      PGUSER: postgres
+      POSTGRES_PASSWORD: difyai123456
+      POSTGRES_DB: dify
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - dify_db_data:/var/lib/postgresql/data
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  dify-redis:
+    image: redis:6-alpine
+    container_name: reading-dify-redis
+    volumes:
+      - dify_redis_data:/data
+    command: redis-server --requirepass difyai123456
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+
+  dify-weaviate:
+    image: semitechnologies/weaviate:1.19.0
+    container_name: reading-dify-weaviate
+    volumes:
+      - dify_weaviate_data:/var/lib/weaviate
+    environment:
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=false
+      - AUTHENTICATION_APIKEY_ENABLED=true
+      - AUTHENTICATION_APIKEY_ALLOWED_KEYS=WVF5YThaHlkYwhGUSmCRgsX3tD5ngdN8pkih
+      - AUTHENTICATION_APIKEY_USERS=hello@dify.ai
+      - AUTHORIZATION_ADMINLIST_ENABLED=true
+      - AUTHORIZATION_ADMINLIST_USERS=hello@dify.ai
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - DEFAULT_VECTORIZER_MODULE=none
+      - CLUSTER_HOSTNAME=node1
+    networks:
+      - reading-network
+    restart: unless-stopped
+
+  dify-api:
+    image: langgenius/dify-api:0.6.13
+    container_name: reading-dify-api
+    ports:
+      - "8091:5001"
+    environment:
+      # Mode
+      - MODE=api
+      # Debug
+      - DEBUG=false
+      - FLASK_DEBUG=false
+      # Database
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=difyai123456
+      - DB_HOST=dify-db
+      - DB_PORT=5432
+      - DB_DATABASE=dify
+      # Redis
+      - REDIS_HOST=dify-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=difyai123456
+      - REDIS_DB=0
+      # Celery
+      - CELERY_BROKER_URL=redis://:difyai123456@dify-redis:6379/1
+      # Vector DB
+      - VECTOR_STORE=weaviate
+      - WEAVIATE_ENDPOINT=http://dify-weaviate:8080
+      - WEAVIATE_API_KEY=WVF5YThaHlkYwhGUSmCRgsX3tD5ngdN8pkih
+      # Web
+      - WEB_API_CORS_ALLOW_ORIGINS=http://localhost:3000,*
+      - CONSOLE_CORS_ALLOW_ORIGINS=http://localhost:3001,*
+      - CONSOLE_WEB_URL=http://localhost:3001
+      - WEB_API_URL=http://localhost:8091
+      - APP_WEB_URL=http://localhost:3000
+      # Files
+      - UPLOAD_FILE_SIZE_LIMIT=15
+      - UPLOAD_FILE_BATCH_LIMIT=5
+      - UPLOAD_IMAGE_FILE_SIZE_LIMIT=10
+      # Mail
+      - MAIL_TYPE=smtp
+      - MAIL_DEFAULT_SEND_FROM=no-reply@dify.ai
+      - SMTP_SERVER=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USERNAME=your-email@gmail.com
+      - SMTP_PASSWORD=your-password
+      - SMTP_USE_TLS=true
+      # Storage
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=storage
+      # Secret
+      - SECRET_KEY=sk-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U
+      - ENCRYPT_PUBLIC_KEY=
+      - CUSTOM_MODEL_ENABLED=true
+      - OLLAMA_API_BASE_URL=http://ollama:11434
+    depends_on:
+      - dify-db
+      - dify-redis
+      - dify-weaviate
+    volumes:
+      - dify_app_storage:/app/api/storage
+    networks:
+      - reading-network
+    restart: unless-stopped
+
+  dify-worker:
+    image: langgenius/dify-api:0.6.13
+    container_name: reading-dify-worker
+    environment:
+      # Mode
+      - MODE=worker
+      # Debug
+      - DEBUG=false
+      - FLASK_DEBUG=false
+      # Database
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=difyai123456
+      - DB_HOST=dify-db
+      - DB_PORT=5432
+      - DB_DATABASE=dify
+      # Redis
+      - REDIS_HOST=dify-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=difyai123456
+      - REDIS_DB=0
+      # Celery
+      - CELERY_BROKER_URL=redis://:difyai123456@dify-redis:6379/1
+      # Vector DB
+      - VECTOR_STORE=weaviate
+      - WEAVIATE_ENDPOINT=http://dify-weaviate:8080
+      - WEAVIATE_API_KEY=WVF5YThaHlkYwhGUSmCRgsX3tD5ngdN8pkih
+      # Storage
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=storage
+      # Secret
+      - SECRET_KEY=sk-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U
+      - CUSTOM_MODEL_ENABLED=true
+      - OLLAMA_API_BASE_URL=http://ollama:11434
+    depends_on:
+      - dify-db
+      - dify-redis
+      - dify-weaviate
+    volumes:
+      - dify_app_storage:/app/api/storage
+    networks:
+      - reading-network
+    restart: unless-stopped
+
+  dify-web:
+    image: langgenius/dify-web:0.6.13
+    container_name: reading-dify-web
+    ports:
+      - "8093:3000"
+    environment:
+      - CONSOLE_API_URL=http://localhost:8091
+      - APP_API_URL=http://localhost:8091
+    depends_on:
+      - dify-api
+    networks:
+      - reading-network
+    restart: unless-stopped
+
+  # Ollama本地大语言模型服务 - DeepSeek R1
+  ollama:
+    image: ollama/ollama:latest
+    container_name: reading-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=5m
+    networks:
+      - reading-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+    # GPU支持 - 如果有NVIDIA GPU，取消注释下面的配置
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+
+networks:
+  reading-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  download_data:
+  dify_db_data:
+  dify_redis_data:
+  dify_weaviate_data:
+  dify_app_storage:
+  ollama_data:

@@ -1,0 +1,26 @@
+server:
+  name: "content-service"
+  host: "localhost"
+  port: 8082
+
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: "password"
+  database: "reading_app"
+  charset: "utf8mb4"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 1
+
+jwt:
+  secret: "reading-app-secret-key"
+  expires_in: 86400
+
+consul:
+  host: "localhost"
+  port: 8500

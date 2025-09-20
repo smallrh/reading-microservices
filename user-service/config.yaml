@@ -1,0 +1,33 @@
+server:
+  name: "user-service"
+  host: "localhost"
+  port: 8081
+
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: "password"
+  database: "reading_app"
+  charset: "utf8mb4"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  host: "localhost"
+  port: 6380
+  password: ""
+  db: 0
+  pool_size: 10
+
+jwt:
+  secret: "reading-app-secret-key-change-in-production"
+  expires_in: 86400
+
+consul:
+  host: "localhost"
+  port: 8500
+
+log:
+  level: "info"
+  format: "json"
